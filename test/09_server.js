@@ -340,4 +340,73 @@ describe('HL7Server', function() {
         });
   });
 
+  it('should parse custom segments', function(done) {
+    const customDict = {
+      segments: {
+        ZDS: {
+          desc: '',
+          fields: [
+            {
+              dt: 'RP',
+              desc: 'Study Instance UID',
+              opt: 'R',
+              rep: 1
+            },
+            {
+              dt: 'ST',
+              desc: 'pointer',
+              opt: 'R',
+              rep: 1
+            }
+          ]
+        }
+      },
+      fields: {
+        RP: {
+          desc: "Reference Pointer",
+          components: [
+            {
+              dt: 'ST',
+              desc: 'pointer',
+              opt: 'O',
+              rep: 1
+            }
+          ]
+        }
+      }
+    };
+
+    const messageString = sampleMessage1 + '\rZDS|1.2.345.67.8.9.12341234123412.345|1.2.345.67.8.9.12341234123412.345';
+
+    server = new HL7Server({customDict});
+    server.listen(8080).then(() => {
+      const msg = HL7Message.parse(messageString, { customDict });
+      let i = 0;
+
+      server.use('ORU^R01', (req) => {
+        i++;
+        try {
+          assert.strictEqual(req.toHL7(), msg.toHL7());
+        } catch (e) {
+          done(e);
+        }
+      });
+
+      server.use((req) => {
+        i++;
+        try {
+          assert.strictEqual(i, 2);
+          assert.strictEqual(req.toHL7(), msg.toHL7());
+          server.close().then(() => done());
+        } catch (e) {
+          done(e);
+        }
+      });
+
+      const client = new HL7Client({customDict});
+      client.connect(8080).then(() => {
+        client.send(msg);
+      });
+    }).catch((e) => done(e));
+  })
 });

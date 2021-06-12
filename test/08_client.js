@@ -142,7 +142,7 @@ describe('HL7Client', function() {
 
   it('should construct validate argument', function() {
     assert.throws(() => {
-      new HL7Client(1234);
+      new HL7Client(1234, {});
     }, /You can provide/);
   });
 
@@ -389,7 +389,55 @@ describe('HL7Client', function() {
       client.connect(8080).then(() =>
           client.send(msg1));
     });
-
   });
 
+  it('should parse custom segments', function() {
+    const customDict = {
+      segments: {
+        ZDS: {
+          desc: '',
+          fields: [
+            {
+              dt: 'RP',
+              desc: 'Study Instance UID',
+              opt: 'R',
+              rep: 1
+            },
+            {
+              dt: 'ST',
+              desc: 'pointer',
+              opt: 'R',
+              rep: 1
+            }
+          ]
+        }
+      },
+      fields: {
+        RP: {
+          desc: "Reference Pointer",
+          components: [
+            {
+              dt: 'ST',
+              desc: 'pointer',
+              opt: 'O',
+              rep: 1
+            }
+          ]
+        }
+      }
+    };
+
+    client = new HL7Client({customDict});
+
+    const messageString = 'MSH|^~\\&||||||||||2.5\r' +
+      'ZDS|1.2.345.67.8.9.12341234123412.345|1.2.345.67.8.9.12341234123412.345'
+    const hl7Message = HL7Message.parse(messageString, {customDict});
+
+    return client.connect(8080).then(() =>
+      client.send(hl7Message).then(() =>
+        listenerOnData().then(data => {
+          assert(data, VT + hl7Message + FS + CR);
+        })
+      ));
+  });
 });
